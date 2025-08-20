@@ -1,43 +1,43 @@
-from dataclasses import InitVar, dataclass, field
+from __future__ import annotations
+
 import dataclasses
-from typing import Dict, Optional, Union, Sequence, List, Mapping, Type, Any, cast, TYPE_CHECKING
-from sigma.types import SigmaType, SigmaNull, SigmaString, sigma_type
-from sigma.modifiers import (
-    SigmaModifier,
-    SigmaRegularExpressionModifier,
-    modifier_mapping,
-    reverse_modifier_mapping,
-    SigmaValueModifier,
-    SigmaListModifier,
-)
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, cast
+
+from typing_extensions import Self
+
+import sigma.exceptions as sigma_exceptions
 from sigma.conditions import (
-    SigmaCondition,
-    ConditionItem,
     ConditionAND,
-    ConditionOR,
     ConditionFieldEqualsValueExpression,
+    ConditionItem,
+    ConditionOR,
     ConditionValueExpression,
     ParentChainMixin,
+    SigmaCondition,
+)
+from sigma.exceptions import SigmaRuleLocation, SigmaTypeError
+from sigma.modifiers import (
+    SigmaListModifier,
+    SigmaModifier,
+    SigmaRegularExpressionModifier,
+    SigmaValueModifier,
+    modifier_mapping,
+    reverse_modifier_mapping,
 )
 from sigma.processing.tracking import ProcessingItemTrackingMixin
-import sigma.exceptions as sigma_exceptions
-from sigma.exceptions import SigmaRuleLocation, SigmaTypeError
+from sigma.types import SigmaNull, SigmaString, SigmaType, sigma_type
 
 if TYPE_CHECKING:
     from sigma.processing.pipeline import ProcessingItemBase
 
 # Type alias for plain detection types
-SigmaDetectionPlainList = List[Union[str, int, float, bool, None]]
-SigmaDetectionPlainDict = Dict[str, Union[str, int, float, bool, SigmaDetectionPlainList, None]]
-SigmaDetectionPlainTypes = Union[
-    SigmaDetectionPlainDict,
-    SigmaDetectionPlainList,
-    str,
-    int,
-    float,
-    bool,
-    None,
-]
+SigmaDetectionPlainList = list[str | int | float | bool | None]
+SigmaDetectionPlainDict = dict[str, str | int | float | bool | SigmaDetectionPlainList | None]
+SigmaDetectionPlainTypes = (
+    SigmaDetectionPlainDict | SigmaDetectionPlainList | str | int | float | bool | None
+)
 
 
 @dataclass
@@ -57,12 +57,12 @@ class SigmaDetectionItem(ProcessingItemTrackingMixin, ParentChainMixin):
     the values. This shouldn't normally be used, but only in test scenarios.
     """
 
-    field: Optional[str]  # if None, this is a keyword argument not bound to a field
-    modifiers: List[Type[SigmaModifier[Any, Any]]]
-    value: List[SigmaType]
-    value_linking: Union[Type[ConditionAND], Type[ConditionOR]] = ConditionOR
-    source: Optional[SigmaRuleLocation] = dataclasses.field(default=None, compare=False)
-    original_value: Optional[List[SigmaType]] = dataclasses.field(
+    field: str | None  # if None, this is a keyword argument not bound to a field
+    modifiers: list[type[SigmaModifier[Any, Any]]]
+    value: list[SigmaType]
+    value_linking: type[ConditionAND | ConditionOR] = ConditionOR
+    source: SigmaRuleLocation | None = dataclasses.field(default=None, compare=False)
+    original_value: list[SigmaType] | None = dataclasses.field(
         init=False, repr=False, hash=False, compare=False
     )  # Copy of original values for conversion back to data structures (and YAML/JSON)
     auto_modifiers: bool = dataclasses.field(default=True, compare=False, repr=False)
@@ -82,7 +82,7 @@ class SigmaDetectionItem(ProcessingItemTrackingMixin, ParentChainMixin):
         """
         Applies modifiers to detection and values
         """
-        applied_modifiers: List[Type[SigmaModifier[Any, Any]]] = list()
+        applied_modifiers: list[type[SigmaModifier[Any, Any]]] = list()
         for modifier in self.modifiers:
             modifier_instance = modifier(self, applied_modifiers, self.source)
             if isinstance(
@@ -103,14 +103,10 @@ class SigmaDetectionItem(ProcessingItemTrackingMixin, ParentChainMixin):
     @classmethod
     def from_mapping(
         cls,
-        key: Optional[str],
-        val: Union[
-            List[Union[int, float, str, bool, None]],
-            Union[int, float, str, bool, None],
-            None,
-        ],
-        source: Optional[SigmaRuleLocation] = None,
-    ) -> "SigmaDetectionItem":
+        key: str | None,
+        val: list[float | str | bool | None] | float | str | bool | None,
+        source: SigmaRuleLocation | None = None,
+    ) -> Self:
         """
         Constructs SigmaDetectionItem object from a mapping between field name containing
         modifiers and a value. This also supports keys containing only value modifiers
@@ -141,7 +137,7 @@ class SigmaDetectionItem(ProcessingItemTrackingMixin, ParentChainMixin):
         sigma_val = [
             (
                 SigmaString.from_str(
-                    cast(str, v)
+                    cast("str", v)
                 )  # The string type is ensured previously by the 're' modifier.
                 if SigmaRegularExpressionModifier in modifiers
                 else sigma_type(v)
@@ -154,13 +150,9 @@ class SigmaDetectionItem(ProcessingItemTrackingMixin, ParentChainMixin):
     @classmethod
     def from_value(
         cls,
-        val: Union[
-            List[Union[int, float, str, bool, None]],
-            Union[int, float, str, bool, None],
-            None,
-        ],
-        source: Optional[SigmaRuleLocation] = None,
-    ) -> "SigmaDetectionItem":
+        val: list[float | str | bool | None] | float | str | bool | None,
+        source: SigmaRuleLocation | None = None,
+    ) -> Self:
         """Convenience method for from_mapping(None, value)."""
         return cls.from_mapping(None, val, source=source)
 
@@ -189,7 +181,7 @@ class SigmaDetectionItem(ProcessingItemTrackingMixin, ParentChainMixin):
             )
 
         if len(self.original_value) > 1:
-            value: Union[str, int, float, bool, None, List[Union[str, int, float, bool, None]]] = [
+            value: str | int | float | bool | None | list[str | int | float | bool | None] = [
                 (
                     value.to_plain(True)
                     if isinstance(value, SigmaString)
@@ -225,17 +217,17 @@ class SigmaDetectionItem(ProcessingItemTrackingMixin, ParentChainMixin):
 
     def postprocess(
         self,
-        detections: "SigmaDetections",
-        parent: Optional[Union["SigmaDetection", "SigmaDetectionItem", "ConditionItem"]] = None,
-        source: Optional[SigmaRuleLocation] = None,
-    ) -> Union[
-        ConditionItem,
-        ConditionAND,
-        ConditionOR,
-        ConditionFieldEqualsValueExpression,
-        ConditionValueExpression,
-        None,
-    ]:
+        detections: SigmaDetections,
+        parent: SigmaDetection | Self | ConditionItem | None = None,
+        source: SigmaRuleLocation | None = None,
+    ) -> (
+        ConditionItem
+        | ConditionAND
+        | ConditionOR
+        | ConditionFieldEqualsValueExpression
+        | ConditionValueExpression
+        | None
+    ):
         super().postprocess(detections, parent, source)
         if len(self.value) == 0:  # no value: map to none type
             if self.field is None:
@@ -283,9 +275,9 @@ class SigmaDetection(ParentChainMixin):
     3. a list of plain values or mappings defined and matched as in 1 where at least one of the items should appear in matched events.
     """
 
-    detection_items: List[Union[SigmaDetectionItem, "SigmaDetection"]]
-    source: Optional[SigmaRuleLocation] = field(default=None, compare=False)
-    item_linking: Union[Type[ConditionAND], Type[ConditionOR], None] = field(default=None)
+    detection_items: list[SigmaDetectionItem | Self]
+    source: SigmaRuleLocation | None = field(default=None, compare=False)
+    item_linking: type[ConditionAND | ConditionOR] | None = field(default=None)
 
     def __post_init__(self) -> None:
         """Check detection validity."""
@@ -302,11 +294,9 @@ class SigmaDetection(ParentChainMixin):
     @classmethod
     def from_definition(
         cls,
-        definition: Union[
-            Mapping[str, Any], List[Union[int, float, str, bool, None]], int, float, str, bool, None
-        ],
-        source: Optional[SigmaRuleLocation] = None,
-    ) -> "SigmaDetection":
+        definition: Mapping[str, Any] | list[float | str | bool | None] | float | str | bool | None,
+        source: SigmaRuleLocation | None = None,
+    ) -> Self:
         """Instantiate an appropriate SigmaDetection object from a parsed Sigma detection definition."""
         if isinstance(definition, Mapping):  # key-value-definition (case 1)
             return cls(
@@ -383,7 +373,7 @@ class SigmaDetection(ParentChainMixin):
                 # The following double loop (the second one is no real one, as it operates on a
                 # single element dict) merges keys (not fields!) into the merged dict.
                 for detection_item_converted in cast(
-                    List[SigmaDetectionPlainDict], detection_items
+                    "list[SigmaDetectionPlainDict]", detection_items
                 ):
                     for k, v in detection_item_converted.items():
                         if k not in merged_dict:  # key doesn't exists in merged dict: just add
@@ -396,7 +386,7 @@ class SigmaDetection(ParentChainMixin):
                                 ):  # make list from existing all-modified value if it's a plain value
                                     merged_dict[k] = [mk]
                                 mkl = cast(
-                                    SigmaDetectionPlainList, merged_dict[k]
+                                    "SigmaDetectionPlainList", merged_dict[k]
                                 )  # existing value is a list
 
                                 if isinstance(v, list):  # merging two and-linked lists is possible
@@ -430,7 +420,7 @@ class SigmaDetection(ParentChainMixin):
                                         mak, list
                                     ):  # ensure that existing 'all' key is a list
                                         merged_dict[ak] = [mak]
-                                    makl = cast(SigmaDetectionPlainList, merged_dict[ak])
+                                    makl = cast("SigmaDetectionPlainList", merged_dict[ak])
                                     makl.extend(vs)
                                 else:  # create new 'all' key from both existing keys
                                     merged_dict[ak] = vs
@@ -442,7 +432,9 @@ class SigmaDetection(ParentChainMixin):
                 }
             else:  # only lists and plain values, merge them into one list
                 merged_list: SigmaDetectionPlainList = list()
-                for detection_item_converted_list in cast(SigmaDetectionPlainList, detection_items):
+                for detection_item_converted_list in cast(
+                    "SigmaDetectionPlainList", detection_items
+                ):
                     if isinstance(
                         detection_item_converted_list, list
                     ):  # if item is a list, extend result list with it.
@@ -455,12 +447,10 @@ class SigmaDetection(ParentChainMixin):
 
     def postprocess(
         self,
-        detections: "SigmaDetections",
-        parent: Optional[Union["SigmaDetection", "SigmaDetectionItem", "ConditionItem"]] = None,
-        source: Optional[SigmaRuleLocation] = None,
-    ) -> Union[
-        "ConditionItem", "ConditionFieldEqualsValueExpression", "ConditionValueExpression", None
-    ]:
+        detections: SigmaDetections,
+        parent: Self | SigmaDetectionItem | ConditionItem | None = None,
+        source: SigmaRuleLocation | None = None,
+    ) -> ConditionItem | ConditionFieldEqualsValueExpression | ConditionValueExpression | None:
         """Convert detection item into condition tree element"""
         super().postprocess(detections, parent, source)
         items = [
@@ -470,7 +460,7 @@ class SigmaDetection(ParentChainMixin):
         if len(items) == 1:  # no boolean linking required, directly return single element
             return items[0]
         elif len(items) > 1:
-            condition = cast(Union[Type[ConditionAND], Type[ConditionOR]], self.item_linking)(
+            condition = cast("type[ConditionAND | ConditionOR]", self.item_linking)(
                 items
             )  # case legitimate because post-init ensures that it's not None anymore.
             condition.postprocess(detections, parent, self.source)
@@ -478,7 +468,7 @@ class SigmaDetection(ParentChainMixin):
         else:  # Detection is empty, e.g. because DropDetectionItem transformation dropped everything.
             return None
 
-    def add_applied_processing_item(self, processing_item: Optional["ProcessingItemBase"]) -> None:
+    def add_applied_processing_item(self, processing_item: ProcessingItemBase | None) -> None:
         """Propagate processing item to all contained detection items."""
         for detection_item in self.detection_items:
             detection_item.add_applied_processing_item(processing_item)
@@ -488,9 +478,9 @@ class SigmaDetection(ParentChainMixin):
 class SigmaDetections:
     """Sigma detection section including named detections and condition."""
 
-    detections: Dict[str, SigmaDetection]
-    condition: List[str]
-    source: Optional[SigmaRuleLocation] = field(default=None, compare=False)
+    detections: dict[str, SigmaDetection]
+    condition: list[str]
+    source: SigmaRuleLocation | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         """Detections sanity checks"""
@@ -505,9 +495,7 @@ class SigmaDetections:
         self.parsed_condition = [SigmaCondition(cond, self, self.source) for cond in self.condition]
 
     @classmethod
-    def from_dict(
-        cls, detections: Dict[str, Any], source: Optional[SigmaRuleLocation] = None
-    ) -> "SigmaDetections":
+    def from_dict(cls, detections: dict[str, Any], source: SigmaRuleLocation | None = None) -> Self:
         try:
             if isinstance(detections["condition"], list):
                 condition = detections["condition"]
@@ -528,12 +516,12 @@ class SigmaDetections:
             source=source,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         detections = {
             identifier: detection.to_plain() for identifier, detection in self.detections.items()
         }
         if len(self.condition) > 1:
-            condition: Union[str, List[str]] = self.condition
+            condition: str | list[str] = self.condition
         else:
             condition = self.condition[0]
 
@@ -553,8 +541,8 @@ class EmptySigmaDetections(SigmaDetections):
     Empty Sigma detection that is used as a placeholder for error handling purposes.
     """
 
-    detections: Dict[str, SigmaDetection] = field(default_factory=dict)
-    condition: List[str] = field(default_factory=list)
+    detections: dict[str, SigmaDetection] = field(default_factory=dict)
+    condition: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # Skip all checks and initializations

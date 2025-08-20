@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, List
-from uuid import UUID
 from enum import Enum, auto
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+from typing_extensions import Self
+
 import sigma.exceptions as sigma_exceptions
-from sigma.exceptions import (
-    SigmaRuleLocation,
-)
+
+if TYPE_CHECKING:
+    from sigma.exceptions import SigmaRuleLocation
 
 
 class EnumLowercaseStringMixin:
@@ -22,7 +27,7 @@ class SigmaStatus(EnumLowercaseStringMixin, Enum):
     TEST = auto()
     STABLE = auto()
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, SigmaStatus):
             return bool(self.value == other.value)
 
@@ -123,7 +128,7 @@ class SigmaRelatedItem:
     type: SigmaRelatedType
 
     @classmethod
-    def from_dict(cls, value: Dict[str, str]) -> "SigmaRelatedItem":
+    def from_dict(cls, value: dict[str, str]) -> Self:
         """Returns Related item from dict with fields."""
         try:
             id = UUID(value["id"])
@@ -145,13 +150,13 @@ class SigmaRelatedItem:
 
 @dataclass
 class SigmaRelated:
-    related: List[SigmaRelatedItem]
+    related: list[SigmaRelatedItem]
 
     @classmethod
-    def from_dict(cls, val: List[Dict[str, str]]) -> "SigmaRelated":
+    def from_dict(cls, val: list[dict[str, str]]) -> Self:
         """Returns Related object from dict with fields."""
 
-        list_ret: List[SigmaRelatedItem] = []
+        list_ret: list[SigmaRelatedItem] = []
         for v in val:
             if "id" not in v.keys():
                 raise sigma_exceptions.SigmaRelatedError("Sigma related must have an id field")
@@ -167,10 +172,10 @@ class SigmaRelated:
 class SigmaRuleTag:
     namespace: str
     name: str
-    source: Optional[SigmaRuleLocation] = field(default=None, compare=False)
+    source: SigmaRuleLocation | None = field(default=None, compare=False)
 
     @classmethod
-    def from_str(cls, tag: str, source: Optional[SigmaRuleLocation] = None) -> "SigmaRuleTag":
+    def from_str(cls, tag: str, source: SigmaRuleLocation | None = None) -> Self:
         """Build SigmaRuleTag class from plain text tag string."""
         try:
             ns, n = tag.split(".", maxsplit=1)

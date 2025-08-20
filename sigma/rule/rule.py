@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
 from typing_extensions import Self
 
@@ -23,9 +25,9 @@ class SigmaRule(SigmaRuleBase, ProcessingItemTrackingMixin):
     @classmethod
     def from_dict(
         cls,
-        rule: Dict[str, Any],
+        rule: dict[str, Any],
         collect_errors: bool = False,
-        source: Optional[SigmaRuleLocation] = None,
+        source: SigmaRuleLocation | None = None,
     ) -> Self:
         """
         Convert Sigma rule parsed in dict structure into SigmaRule object.
@@ -80,7 +82,7 @@ class SigmaRule(SigmaRuleBase, ProcessingItemTrackingMixin):
             **kwargs,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert rule object into dict."""
         d = super().to_dict()
         d.update(
